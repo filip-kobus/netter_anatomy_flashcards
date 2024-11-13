@@ -66,6 +66,8 @@ function displayImage(src, boxes) {
             document.querySelectorAll('.bounding-box').forEach(box => box.remove());
 
             // Add new bounding boxes scaled
+            console.log('Bounding Boxes:', boxes); // Debugging statement
+
             boxes.forEach((box, index) => {
                 const rect = document.createElement('div');
                 rect.classList.add('bounding-box');
@@ -77,6 +79,9 @@ function displayImage(src, boxes) {
                 rect.addEventListener('click', function() {
                     rect.classList.toggle('hidden');
                 });
+
+                console.log(`Appending box: ${index}`, rect);  // Debugging statement
+
                 imgContainer.appendChild(rect);
             });
         };

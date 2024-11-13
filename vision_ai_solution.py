@@ -4,7 +4,7 @@ import numpy as np
 from google.cloud import vision
 from scipy.spatial import distance
 from scipy.cluster.hierarchy import fcluster, linkage
-import cv2
+ 
 
 class VisionAI:
 
@@ -13,14 +13,11 @@ class VisionAI:
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = client_path
         self.client = vision.ImageAnnotatorClient()
 
-        self.image = cv2.imread(image_path)
         self.content = self.open_image(image_path)
         self.texts = self.detect_text()
-
         self.words = self.extract_words()
         self.positions = np.array([[word['x'], word['y']] for word in self.words])
         self.grouped_boxes = self.group_and_get_boxes()
-        self.draw_bounding_boxes()
 
     def open_image(self, path):
         with io.open(path, 'rb') as image_file:
@@ -66,21 +63,7 @@ class VisionAI:
             min_x, max_x = min(x_coords), max(x_coords)
             min_y, max_y = min(y_coords), max(y_coords)
             grouped_boxes.append(((min_x, min_y), (max_x, max_y)))
-
-            cluster_text = ' '.join(word['text'] for word in cluster_words)
-            print(f"Clustered caption: {cluster_text}")
-            print(f"Bounding box: {((min_x, min_y), (max_x, max_y))}")
-
         return grouped_boxes
 
-    def draw_bounding_boxes(self):
-        for box in self.grouped_boxes:
-            cv2.rectangle(self.image, box[0], box[1], color=(0, 255, 0), thickness=2)
-
-        cv2.imshow("Image with Clustered Bounding Boxes", self.image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-
-if __name__ == "__main__":
-    vision_ai = VisionAI(image_path='your_image_path.jpg', client_path='path_to_your_client_file.json')
+    def get_text_positions(self):
+        return self.grouped_boxes
