@@ -37,6 +37,7 @@
                         {% if image.caption %}
                             <div class="caption">{{ image.caption }}</div>
                         {% endif %}
+                        <button class="delete-btn" data-filename="{{ image.filename }}">x</button>
                     </div>
                 {% endfor %}
             </div>

@@ -35,6 +35,33 @@ document.addEventListener('DOMContentLoaded', function() {
     if (existingGroupedBoxes) {
         displayImage(document.getElementById('uploaded-image').src, existingGroupedBoxes);
     }
+
+    document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const filename = this.getAttribute('data-filename');
+
+            if (confirm(`Czy na pewno chcesz usunąć ${filename}?`)) {
+                try {
+                    const response = await fetch(`/delete/${filename}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        location.reload();  // Reload the page to update the gallery
+                    } else {
+                        alert('Wystąpił błąd podczas usuwania pliku.');
+                    }
+                } catch (error) {
+                    console.error('Error deleting image:', error);
+                }
+            }
+        });
+    });
+
 });
 
 function displayImage(src, boxes) {
@@ -78,6 +105,8 @@ function displayImage(src, boxes) {
                 });
                 imgContainer.appendChild(rect);
             });
+
+
         };
     };
 }
