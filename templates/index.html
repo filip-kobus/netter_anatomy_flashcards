@@ -3,48 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <title>Anatomia Fiszki</title>
-    <link rel="stylesheet" href="../static/styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 0;
+            text-align: center;
+        }
+        .container {
+            width: 80%;
+            margin: 20px auto;
+        }
+        form {
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        form input[type="file"],
+        form input[type="text"] {
+            display: inline-block;
+            margin-right: 10px;
+            padding: 5px;
+        }
+        form input[type="submit"] {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        form input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+        .gallery h2, .image-section h2 {
+            text-align: center;
+            color: #343a40;
+        }
+        .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .gallery a {
+            margin: 10px;
+            text-align: center;
+            color: #343a40;
+        }
+        .gallery img {
+            max-width: 200px;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+        .gallery img:hover {
+            transform: scale(1.05);
+        }
+        #image-container {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+            display: inline-block;
+        }
+        #image-container img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .bounding-box {
+            position: absolute;
+            border: 2px dashed #00ffff;
+            background-color: rgba(0, 255, 255, 1);
+            cursor: pointer;
+            transition: opacity 0.3s, background-color 0.3s;
+            border-radius: 4px; /* slightly rounded corners */
+        }
+        .bounding-box.hidden {
+            opacity: 0;
+        }
+        .bounding-box:hover {
+            background-color: rgba(0, 255, 255, 0.9);
+            border-color: #00cccc; /* a bit darker on hover */
+        }
+        .caption {
+            margin-top: 5px;
+            font-style: italic;
+            color: #6c757d;
+        }
+    </style>
 </head>
 <body>
     <header>
         <h1>Anatomia Fiszki</h1>
     </header>
     <div class="container">
-        <form method="post" enctype="multipart/form-data" action="/upload">
-            <input type="file" name="file" required>
-            <input type="text" name="caption" placeholder="Wpisz nazwę (opcjonalnie)">
-            <input type="submit" value="Dodaj">
-        </form>
+    <form method="post" enctype="multipart/form-data" action="/upload">
+        <input type="file" name="file" required>
+        <input type="text" name="caption" placeholder="Wpisz nazwę (opcjonalnie)">
+        <input type="submit" value="Dodaj">
+    </form>
 
-        {% if filename %}
-            <div class="image-section">
-                <h2>Fiszka</h2>
-                <div id="image-container">
-                    <img src="{{ url_for('uploaded_file', filename=filename) }}" id="uploaded-image" alt="Uploaded Image">
-                </div>
-            </div>
-        {% endif %}
 
-        <div class="gallery-section">
-            <h2>Moje Fiszki</h2>
-            <div class="gallery">
-                {% for image in uploaded_images %}
-                    <div class="image-entry">
-                        <a href="{{ url_for('show_image', filename=image.filename) }}">
-                            <img src="{{ url_for('uploaded_file', filename=image.filename) }}" alt="{{ image.filename }}">
-                        </a>
-                        {% if image.caption %}
-                            <div class="caption">{{ image.caption }}</div>
-                        {% endif %}
-                        <form method="post" action="{{ url_for('delete_image', filename=image.filename) }}" class="delete-form">
-                            <button type="submit" class="delete-button">x</button>
-                        </form>
-                    </div>
-                {% endfor %}
+    {% if filename %}
+        <div class="image-section">
+            <h2>Fiszka</h2>
+            <div id="image-container">
+                <img src="{{ url_for('uploaded_file', filename=filename) }}" id="uploaded-image" alt="Uploaded Image">
             </div>
         </div>
-    </div>
+    {% endif %}
 
-    <script src="script.js"></script>
+    <div class="gallery-section">
+        <h2>Moje Fiszki</h2>
+        <div class="gallery">
+            {% for image in uploaded_images %}
+                <div class="image-entry">
+                    <a href="{{ url_for('show_image', filename=image.filename) }}">
+                        <img src="{{ url_for('uploaded_file', filename=image.filename) }}" alt="{{ image.filename }}">
+                    </a>
+                    {% if image.caption %}
+                        <div class="caption">{{ image.caption }}</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const pasteArea = document.getElementById('paste-area');
+
+        pasteArea.addEventListener('click', () => {
+            pasteArea.focus();
+        });
+
+        pasteArea.addEventListener('paste', async function(event) {
+            const clipboardItems = event.clipboardData.items;
+            for (let item of clipboardItems) {
+                if (item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('caption', 'Pasted Image'); // Add a default caption if you wish
+
+                    try {
+                        const response = await fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.text();
+                        document.body.innerHTML = result; // Replace the entire body with new content
+                    } catch (error) {
+                        console.error('Error uploading the pasted image:', error);
+                    }
+                }
+            }
+        });
+    });
+
+    const existingGroupedBoxes = {{ grouped_boxes | tojson | safe }};
+
+    if (existingGroupedBoxes) {
+        displayImage("{{ url_for('uploaded_file', filename=filename) }}", existingGroupedBoxes);
+    }
+
+    function displayImage(src, boxes) {
+        const imgContainer = document.querySelector('#image-container');
+        const imgElement = document.querySelector('#uploaded-image');
+
+        if (!imgElement) {
+            return;
+        }
+
+        // Update img element src
+        imgElement.src = src;
+
+        imgElement.onload = function () {
+            // Get the actual dimensions of the displayed image
+            const displayedWidth = imgElement.clientWidth;
+            const displayedHeight = imgElement.clientHeight;
+
+            // Get the original dimensions of the image
+            const originalImage = new Image();
+            originalImage.src = src;
+            originalImage.onload = function () {
+                const originalWidth = originalImage.width;
+                const originalHeight = originalImage.height;
+
+                // Calculate scale factors
+                const scaleX = displayedWidth / originalWidth;
+                const scaleY = displayedHeight / originalHeight;
+
+                // Clear existing bounding boxes
+                document.querySelectorAll('.bounding-box').forEach(box => box.remove());
+
+                // Add new bounding boxes scaled
+                boxes.forEach((box, index) => {
+                    const rect = document.createElement('div');
+                    rect.classList.add('bounding-box');
+                    rect.style.left = `${box[0][0] * scaleX}px`;
+                    rect.style.top = `${box[0][1] * scaleY}px`;
+                    rect.style.width = `${(box[1][0] - box[0][0]) * scaleX}px`;
+                    rect.style.height = `${(box[1][1] - box[0][1]) * scaleY}px`;
+                    rect.setAttribute('data-index', index);
+                    rect.addEventListener('click', function() {
+                        rect.classList.toggle('hidden');
+                    });
+                    imgContainer.appendChild(rect);
+                });
+            };
+        };
+    }
+</script>
 </body>
 </html>

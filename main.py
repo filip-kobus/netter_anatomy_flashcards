@@ -71,5 +71,18 @@ def show_image(filename):
         return 'Image not found', 404
 
 
+@app.route('/delete/<filename>', methods=['POST'])
+def delete_file(filename):
+    uploaded_images = load_uploaded_images()
+    updated_images = [img for img in uploaded_images if img['filename'] != filename]
+    save_uploaded_images(updated_images)
+
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    return jsonify(success=True)
+
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0')
+    app.run(debug=True)
