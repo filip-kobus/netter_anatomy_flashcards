@@ -4,7 +4,34 @@ import numpy as np
 from google.cloud import vision
 from scipy.spatial import distance
 from scipy.cluster.hierarchy import fcluster, linkage
- 
+import cv2
+from sphinx.ext.autodoc import between
+
+
+class Flashcard:
+    def __init__(self, left, right, top, height):
+        self.left = left
+        self.right = right
+        self.top = top
+        self.bottom = height
+
+    def add_flashcard(self, flashcard):
+        self.right = max(self.right, flashcard.right)
+        self.left = min(self.left, flashcard.left)
+        self.top = min(self.top, flashcard.top)
+        self.bottom = max(self.bottom, flashcard.bottom)
+
+    def print_properties(self):
+        print(f'Left: {self.left}, Right: {self.right}, Top: {self.top}, Bottom: {self.bottom}')
+
+    def get_height(self):
+        return self.bottom - self.top
+
+    def is_overlapping(self, other):
+        left = max(self.left, other.left)
+        right = min(self.right, other.right)
+        return right > left
+
 
 class VisionAI:
 
@@ -13,11 +40,10 @@ class VisionAI:
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = client_path
         self.client = vision.ImageAnnotatorClient()
 
+        self.image = cv2.imread(image_path)
         self.content = self.open_image(image_path)
         self.texts = self.detect_text()
         self.words = self.extract_words()
-        self.positions = np.array([[word['x'], word['y']] for word in self.words])
-        self.grouped_boxes = self.group_and_get_boxes()
 
     def open_image(self, path):
         with io.open(path, 'rb') as image_file:
@@ -44,26 +70,95 @@ class VisionAI:
             words.append({'text': word, 'x': x_center, 'y': y_center, 'vertices': vertices})
         return words
 
-    def weighted_distance(self, u, v):
-        horizontal_weight = 1.0  # Adjust this to place more weight on horizontal proximity
-        vertical_weight = 3.0  # Adjust this to control vertical sensitivity
-        return distance.euclidean((u[0] * horizontal_weight, u[1] * vertical_weight),
-                                  (v[0] * horizontal_weight, v[1] * vertical_weight))
+    def create_flashcards(self, words):
+        flashcards = []
 
-    def group_and_get_boxes(self):
-        Z = linkage(self.positions, method='single', metric=self.weighted_distance)
-        threshold_distance = 60  # Tune this based on desired clustering range
-        clusters = fcluster(Z, t=threshold_distance, criterion='distance')
+        for word in self.words:
+            def get_midpoint(point1, point2):
+                return int((point1 + point2) / 2)
 
-        grouped_boxes = []
-        for cluster_id in set(clusters):
-            cluster_words = [self.words[i] for i in range(len(self.words)) if clusters[i] == cluster_id]
-            x_coords = [vertex[0] for word in cluster_words for vertex in word['vertices']]
-            y_coords = [vertex[1] for word in cluster_words for vertex in word['vertices']]
-            min_x, max_x = min(x_coords), max(x_coords)
-            min_y, max_y = min(y_coords), max(y_coords)
-            grouped_boxes.append(((min_x, min_y), (max_x, max_y)))
-        return grouped_boxes
+            left_upper = word['vertices'][0]
+            right_upper = word['vertices'][1]
+            right_lower = word['vertices'][2]
+            left_lower = word['vertices'][3]
 
-    def get_text_positions(self):
-        return self.grouped_boxes
+            left = get_midpoint(left_upper[0], left_lower[0])
+            right = get_midpoint(right_upper[0], right_lower[0])
+            top = get_midpoint(left_upper[1], right_upper[1])
+            bottom = get_midpoint(left_lower[1], right_lower[1])
+
+            flashcard = Flashcard(left, right, top, bottom)
+            flashcards.append(flashcard)
+
+        flashcards.sort(key=lambda f: f.left)
+
+        return flashcards
+
+    def get_spacings(self, flashcards):
+        sorted_cards = sorted(flashcards, key=lambda f: f.get_height())
+        median_height = sorted_cards[len(sorted_cards) // 2].get_height()
+
+        words_spacing = 11/20 * median_height
+        line_height_differs = 6/20 * median_height
+        horizontal_spacing = 6/20 * median_height
+
+        return words_spacing, line_height_differs, horizontal_spacing
+
+    def words_to_flashcards(self):
+        flashcards = self.create_flashcards(self.words)
+        words_spacing, height_difference, horizontal_spacing = self.get_spacings(flashcards)
+
+        def connect_vertically():
+            size = len(flashcards)
+            i = 0
+            while i < size:
+                card = flashcards[i]
+                j = i + 1
+                while j < size:
+                    next_card = flashcards[j]
+                    if abs(next_card.bottom - card.bottom) < height_difference and abs(
+                            next_card.left - card.right) < words_spacing:
+                        card.add_flashcard(next_card)
+                        flashcards.pop(j)
+                        size -= 1
+                    else:
+                        j += 1
+
+                i += 1
+
+        def connect_horizontally():
+            size = len(flashcards)
+            flashcards.sort(key = lambda f: f.top)
+            i = 0
+            while i < size:
+                card = flashcards[i]
+                j = i + 1
+                while j < size:
+                    next_card = flashcards[j]
+                    if abs(next_card.top - card.bottom) < horizontal_spacing and card.is_overlapping(next_card):
+                        card.add_flashcard(next_card)
+                        flashcards.pop(j)
+                        size -= 1
+                    else:
+                        j += 1
+
+                i += 1
+
+        connect_vertically()
+        connect_horizontally()
+
+        return flashcards
+
+    def draw_bounding_boxes(self):
+        flashcards = self.words_to_flashcards()
+        for card in flashcards:
+            cv2.rectangle(self.image, (card.left, card.top), (card.right, card.bottom), color=(0, 255, 0), thickness=2)
+
+        cv2.imshow("Image with Clustered Bounding Boxes", self.image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    vision_ai = VisionAI(image_path='static/uploads/nerki.png', client_path='client_file.json')
+    vision_ai.draw_bounding_boxes()
