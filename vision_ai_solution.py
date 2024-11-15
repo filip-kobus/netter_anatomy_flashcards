@@ -1,12 +1,6 @@
 import io
 import os
-import numpy as np
 from google.cloud import vision
-from scipy.spatial import distance
-from scipy.cluster.hierarchy import fcluster, linkage
-import cv2
-from sphinx.ext.autodoc import between
-
 
 class Flashcard:
     def __init__(self, left, right, top, height):
@@ -32,6 +26,11 @@ class Flashcard:
         right = min(self.right, other.right)
         return right > left
 
+    def left_upper_corner(self):
+        return self.left, self.top
+
+    def right_lower_corner(self):
+        return self.right, self.bottom
 
 class VisionAI:
 
@@ -40,10 +39,11 @@ class VisionAI:
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = client_path
         self.client = vision.ImageAnnotatorClient()
 
-        self.image = cv2.imread(image_path)
         self.content = self.open_image(image_path)
         self.texts = self.detect_text()
         self.words = self.extract_words()
+        self.flashcards = self.words_to_flashcards()
+        self.grouped_boxes = self.flashcards_to_boxes()
 
     def open_image(self, path):
         with io.open(path, 'rb') as image_file:
@@ -60,17 +60,32 @@ class VisionAI:
 
         return texts
 
+    @staticmethod
+    def contains_artefacts(word):
+        count = sum(c.isdigit() for c in word)
+        if count > 4:
+            return True
+
+        artifacts = ['ebrary', 'F.Netter']
+        for artifact in artifacts:
+            if word in artifact:
+                return True
+
+        return False
+
     def extract_words(self):
         words = []
-        for text in self.texts[1:]:  # Skip the first result as it contains the entire text
+        for text in self.texts[1:]:
             word = text.description
             vertices = [(vertex.x, vertex.y) for vertex in text.bounding_poly.vertices]
             x_center = sum([v[0] for v in vertices]) / 4
             y_center = sum([v[1] for v in vertices]) / 4
-            words.append({'text': word, 'x': x_center, 'y': y_center, 'vertices': vertices})
+
+            if not self.contains_artefacts(word):
+                words.append({'text': word, 'x': x_center, 'y': y_center, 'vertices': vertices})
         return words
 
-    def create_flashcards(self, words):
+    def create_flashcards(self):
         flashcards = []
 
         for word in self.words:
@@ -100,12 +115,12 @@ class VisionAI:
 
         words_spacing = 11/20 * median_height
         line_height_differs = 6/20 * median_height
-        horizontal_spacing = 6/20 * median_height
+        horizontal_spacing = 8/20 * median_height
 
         return words_spacing, line_height_differs, horizontal_spacing
 
     def words_to_flashcards(self):
-        flashcards = self.create_flashcards(self.words)
+        flashcards = self.create_flashcards()
         words_spacing, height_difference, horizontal_spacing = self.get_spacings(flashcards)
 
         def connect_vertically():
@@ -125,7 +140,6 @@ class VisionAI:
                         j += 1
 
                 i += 1
-
         def connect_horizontally():
             size = len(flashcards)
             flashcards.sort(key = lambda f: f.top)
@@ -149,16 +163,10 @@ class VisionAI:
 
         return flashcards
 
-    def draw_bounding_boxes(self):
-        flashcards = self.words_to_flashcards()
-        for card in flashcards:
-            cv2.rectangle(self.image, (card.left, card.top), (card.right, card.bottom), color=(0, 255, 0), thickness=2)
-
-        cv2.imshow("Image with Clustered Bounding Boxes", self.image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-
-if __name__ == "__main__":
-    vision_ai = VisionAI(image_path='static/uploads/nerki.png', client_path='client_file.json')
-    vision_ai.draw_bounding_boxes()
+    def flashcards_to_boxes(self):
+        boxes = []
+        for flashcard in self.flashcards:
+            left, top = flashcard.left_upper_corner()
+            right, bottom = flashcard.right_lower_corner()
+            boxes.append(((left, top), (right, bottom)))
+        return boxes
