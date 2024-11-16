@@ -2,7 +2,7 @@ from flask import Flask, request, render_template, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 import os
 import json
-from vision_ai_solution import VisionAI
+from vision import VisionAI
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/'
