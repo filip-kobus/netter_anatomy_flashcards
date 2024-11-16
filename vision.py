@@ -51,6 +51,7 @@ class VisionAI:
     HORIZONTAL_SPACING_RATIO = 11 / 20
     VERTICAl_SPACING_RATIO = 8 / 20
     HEIGHT_DIFFERENCE_RATIO = 6 / 20
+    ARTIFACTS = ['ebrary', 'F.Netter']
 
     def __init__(self, image_path, client_path='client_file.json'):
         self.path = image_path
@@ -83,7 +84,7 @@ class VisionAI:
         if count > 4:
             return True
 
-        artifacts = ['ebrary', 'F.Netter']
+        artifacts = VisionAI.ARTIFACTS
         for artifact in artifacts:
             if word in artifact:
                 return True
