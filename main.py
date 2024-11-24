@@ -1,5 +1,4 @@
 from flask import Flask, request, render_template, send_from_directory, jsonify
-from werkzeug.utils import secure_filename
 import os
 import json
 from vision import VisionAI

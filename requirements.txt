@@ -1,5 +1,3 @@
 Flask
-Werkzeug
-numpy
 google-cloud-vision
 scipy
